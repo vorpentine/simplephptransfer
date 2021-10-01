@@ -1,16 +1,32 @@
 <?php
 
+date_default_timezone_set('Europe/London');
+$expires=86400*7;
+
+session_start();
+if ($_SESSION['TS']) {
+} else {
+	$_SESSION['TS']=date("U");
+}
+
 $file=$_GET['d'];
+
 if ($file) {
+	$continue=0;
 	$file=preg_replace('/[^a-zA-Z0-9]/',"",$file);
 	if (file_exists("/var/www/attachments/$file.json")) {
 		$details=file_get_contents("/var/www/attachments/$file.json");
 		$details=json_decode($details,true);
 		//print_r($details);
 		//echo $file;
-		header("Content-disposition: attachment; filename=".$details['filename']);
-		header("Content-type: ".$details['type']."/download");
-		readfile("/var/www/attachments/$file");
+		if ($_SESSION['TS']==$_GET['ts']) {
+			header("Content-disposition: attachment; filename=".$details['filename']);
+			header("Content-type: ".$details['type']."/download");
+			readfile("/var/www/attachments/$file");
+		} else {
+			$download=$file;
+			$continue=1;
+		}
 	} else {
 		die("Nothing here, transfers delete after 1 week");
 	}
@@ -18,11 +34,11 @@ if ($file) {
 	//echo "Delete old files";
 	$files=glob("/var/www/attachments/*");
 	foreach($files as $file) {
-		if (date("U")-filemtime($file) > 86400*7) {
+		if (date("U")-filemtime($file) > $expires) {
 			unlink($file);
 		}
 	}
-	die();
+	if (!$continue) die();
 }
 
 $filename=$_GET['n'];
@@ -37,6 +53,7 @@ function process_file($tmpfile,$filename) {
 	
 	$details['type']=$type;
 	$details['filename']=$filename;
+	$details['ts']=date("U");
 	
 	$savename=md5($tmpfile.$filename);	
 	mkdir("/var/www/attachments",755,true);
@@ -46,10 +63,10 @@ function process_file($tmpfile,$filename) {
 	
 	//print_r($_SERVER);
 	
-	echo "<a target=_blank href=\"?d=$savename\">$filename</a>";
+	echo (stripos($_SERVER['SERVER_PROTOCOL'],'https') === 0 ? 'https://' : 'http://').$_SERVER['HTTP_HOST']."?d=$savename<br><a target=_blank href=\"?d=$savename\">$filename</a>";
 	echo "<button style=\"margin-left: 15px;\" class=\"btn btn-light\" onmouseup=\"
 		copyTextToClipboard('".(stripos($_SERVER['SERVER_PROTOCOL'],'https') === 0 ? 'https://' : 'http://').$_SERVER['HTTP_HOST']."?d=$savename');
-	\">&#10697;</button>";
+	\">&#10697; copy to clipboard</button>";
 	echo "<br><br>";
 }
 
@@ -74,10 +91,24 @@ if ($filename) {
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 	<head>
+		<title>SPT</title>
 		<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
 		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<link rel="apple-touch-icon" sizes="114x114" href="iconified/apple-touch-icon-114x114.png" />
+		<link rel="apple-touch-icon" sizes="120x120" href="iconified/apple-touch-icon-120x120.png" />
+		<link rel="apple-touch-icon" sizes="144x144" href="iconified/apple-touch-icon-144x144.png" />
+		<link rel="apple-touch-icon" sizes="152x152" href="iconified/apple-touch-icon-152x152.png" />
+		<link rel="apple-touch-icon" sizes="52x52" href="iconified/apple-touch-icon-52x52.png" />
+		<link rel="apple-touch-icon" sizes="57x57" href="iconified/apple-touch-icon-57x57.png" />
+		<link rel="apple-touch-icon" sizes="72x72" href="iconified/apple-touch-icon-72x72.png" />
+		<link rel="apple-touch-icon" sizes="76x76" href="iconified/apple-touch-icon-76x76.png" />
+		<link rel="shortcut icon" href="iconified/favicon.ico" type="image/x-icon">
+		<link rel="icon" href="iconified/favicon.ico" type="image/x-icon">	
+		
 		<link rel="manifest" href="manifest.json">
-		<meta id=myviewport name="viewport" content="width=550, user-scalable=no" /><!-- initial-scale=1.0, maximum-scale=1.0, -->
+		<meta id=myviewport name="viewport" content="width=350, user-scalable=no" /><!-- initial-scale=1.0, maximum-scale=1.0, -->
 		<script>
 			function fallbackCopyTextToClipboard(text) {
 				var textArea = document.createElement("textarea");
@@ -192,13 +223,15 @@ if ($filename) {
 				margin-bottom: 15px;
 			">SPT</div>
 			<h1 class="h3 mb-3 font-weight-normal">Simple Transfer</h1>
-			Transfers delete after 1 week
-			
 			<div id=attach></div>
-			
-			<button class="btn btn-success" onmouseup="
-				$('#upload').click();
-			">Send File</button>
+<?php
+	if ($file) {
+		echo "<button class=\"btn btn-success\" onmouseup=\"window.location='?d=$download&ts=".$_SESSION['TS']."';\">Download ".$details['filename']."</button><br><br>";
+		echo "Expires in ".round((($details['ts']+$expires)-date("U"))/(60*60),2)." hours";
+	} else {
+		echo "<button class=\"btn btn-success\" onmouseup=\"$('#upload').click();\">Send File</button><br><br>Transfers expire in 1 week";
+	}
+?>			
 			<br><span id=progress></span><br>
 			<input style="display: none;" type="file" id="upload" onchange="handleFileSelect(event);">
 			
