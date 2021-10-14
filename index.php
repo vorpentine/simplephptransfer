@@ -63,9 +63,9 @@ function process_file($tmpfile,$filename) {
 	
 	//print_r($_SERVER);
 	
-	echo (stripos($_SERVER['SERVER_PROTOCOL'],'https') === 0 ? 'https://' : 'http://').$_SERVER['HTTP_HOST']."?d=$savename<br><a target=_blank href=\"?d=$savename\">$filename</a>";
+	echo (stripos($_SERVER['HTTP_ORIGIN'],'https') === 0 ? 'https://' : 'http://').$_SERVER['HTTP_HOST']."?d=$savename<br><a target=_blank href=\"?d=$savename\">$filename</a>";
 	echo "<button style=\"margin-left: 15px;\" class=\"btn btn-light\" onmouseup=\"
-		copyTextToClipboard('".(stripos($_SERVER['SERVER_PROTOCOL'],'https') === 0 ? 'https://' : 'http://').$_SERVER['HTTP_HOST']."?d=$savename');
+		copyTextToClipboard('".(stripos($_SERVER['HTTP_ORIGIN'],'https') === 0 ? 'https://' : 'http://').$_SERVER['HTTP_HOST']."?d=$savename');
 	\">&#10697; copy to clipboard</button>";
 	echo "<br><br>";
 }
