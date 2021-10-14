@@ -2,4 +2,4 @@
 
 Just deploy to your php enabled webserver
 
-![Screenshot](("https://github.com/vorpentine/simplephptransfer/blob/master/simple.png?raw=true"))
+![Screenshot](https://github.com/vorpentine/simplephptransfer/blob/main/simple.png?raw=true)
