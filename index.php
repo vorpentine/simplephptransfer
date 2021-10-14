@@ -40,53 +40,6 @@ if ($file) {
 	}
 	if (!$continue) die();
 }
-
-$filename=$_GET['n'];
-$filename=preg_replace('/[^A-Za-z0-9\.\-_]/',"-",$filename);
-
-function process_file($tmpfile,$filename) {
-	global $res;
-	$details=[];
-	$finfo = finfo_open(FILEINFO_MIME_TYPE);
-	$type=finfo_file($finfo,"/tmp/$tmpfile");
-	finfo_close($finfo);
-	
-	$details['type']=$type;
-	$details['filename']=$filename;
-	$details['ts']=date("U");
-	
-	$savename=md5($tmpfile.$filename);	
-	mkdir("/var/www/attachments",755,true);
-	$myfile="/var/www/attachments/$savename";
-	rename("/tmp/$tmpfile",$myfile);
-	file_put_contents("/var/www/attachments/$savename.json",json_encode($details));
-	
-	//print_r($_SERVER);
-	
-	echo (stripos($_SERVER['HTTP_ORIGIN'],'https') === 0 ? 'https://' : 'http://').$_SERVER['HTTP_HOST']."?d=$savename<br><a target=_blank href=\"?d=$savename\">$filename</a>";
-	echo "<button style=\"margin-left: 15px;\" class=\"btn btn-light\" onmouseup=\"
-		copyTextToClipboard('".(stripos($_SERVER['HTTP_ORIGIN'],'https') === 0 ? 'https://' : 'http://').$_SERVER['HTTP_HOST']."?d=$savename');
-	\">&#10697; copy to clipboard</button>";
-	echo "<br><br>";
-}
-
-if ($filename) {
-	$pathinfo=pathinfo($filename);
-	$ts=$pathinfo['filename']."_".date("YmdHi").".".$pathinfo['extension'];
-	$inputHandler = fopen('php://input', "r");
-	$fileHandler = fopen("/tmp/$ts", "w+");
-	while(true) {
-		$buffer = fgets($inputHandler, 4096);
-		if (strlen($buffer) == 0) {
-			fclose($inputHandler);
-			fclose($fileHandler);
-		       break;
-		}
-		fwrite($fileHandler, $buffer);
-	}
-	process_file($ts,$filename); 
-	die();
-}
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -144,69 +97,7 @@ if ($filename) {
 					}, function(err) {
 					console.error('Async: Could not copy text: ', err);
 				});
-			}
-			
-			var busy=0;
-
-			function handleFileSelect(evt) {
-				var files = evt.target.files; 
-				for (var i = 0, f; f = files[i]; i++) {
-					upload(i);
-				}
-			}
-
-			function upload(fileIndex) {
-				if (busy) {
-					setTimeout("upload('"+fileIndex+"');",500);
-				} else {
-					file = document.getElementById('upload').files[fileIndex];
-					var reader = new FileReader();
-					reader.readAsBinaryString(file); // alternatively you can use readAsDataURL
-					reader.onloadend  = function(evt) {
-						xhr = new XMLHttpRequest();
-						xhr.open("POST", '?n='+file.name, true);
-						XMLHttpRequest.prototype.mySendAsBinary = function(text) {
-							var data = new ArrayBuffer(text.length);
-								var ui8a = new Uint8Array(data, 0);
-							for (var i = 0; i < text.length; i++) ui8a[i] = (text.charCodeAt(i) & 0xff);
-							if(typeof window.Blob == "function") {
-								var blob = new Blob([data]);
-							} else {
-								var bb = new (window.MozBlobBuilder || window.WebKitBlobBuilder || window.BlobBuilder)();
-								bb.append(data);
-								var blob = bb.getBlob();
-							}
-							this.send(blob);
-						}
-				
-						var eventSource = xhr.upload || xhr;
-						eventSource.addEventListener("progress", function(e) {
-							// get percentage of how much of the current file has been sent
-							var position = e.position || e.loaded;
-							var total = e.totalSize || e.total;
-							var percentage = Math.round((position/total)*100);
-							// here you should write your own code how you wish to proces this
-							document.getElementById('progress').innerHTML=percentage+'%';
-						});
-				
-						// state change observer - we need to know when and if the file was successfully uploaded
-						xhr.onreadystatechange = function() {
-							if(xhr.readyState == 4) {
-								//alert(xhr.responseText);
-								if(xhr.status == 200) {
-									$('#attach').append(xhr.responseText);
-									busy=0;
-								} else {
-									busy=0;
-									// process error
-								}
-							}
-						};
-					// start sending
-					xhr.mySendAsBinary(evt.target.result);
-			};}} //WTF BRACE?
-
-			var floatreturn='';		
+			}			
 		</script>
 	</head>
 	<body class="text-center">
@@ -229,12 +120,62 @@ if ($filename) {
 		echo "<button class=\"btn btn-success\" onmouseup=\"window.location='?d=$download&ts=".$_SESSION['TS']."';\">Download ".$details['filename']."</button><br><br>";
 		echo "Expires in ".round((($details['ts']+$expires)-date("U"))/(60*60),2)." hours";
 	} else {
-		echo "<button class=\"btn btn-success\" onmouseup=\"$('#upload').click();\">Send File</button><br><br>Transfers expire in 1 week";
-	}
+		echo "Transfers expire in 1 week";
+?>
+		<!-- CHECK https://cdnjs.com/libraries/plupload FOR LATEST VERSION -->
+		<!-- OFFICIAL WEBSITE: https://www.plupload.com/ -->
+		<script src="plupload.full.min.js"></script>
+		<script>
+			window.addEventListener("load", function () {
+				var uploader = new plupload.Uploader({
+					runtimes: 'html5,html4',
+					browse_button: 'pickfiles',
+					url: '2b-chunk.php',
+					chunk_size: '50mb',
+					/* OPTIONAL
+					filters: {
+					max_file_size: '150mb',
+					mime_types: [{title: "Image files", extensions: "jpg,gif,png"}]
+					},
+					*/
+					init: {
+						PostInit: function () {
+							document.getElementById('filelist').innerHTML = '';
+						},
+						FilesAdded: function (up, files) {
+							plupload.each(files, function (file) {
+								document.getElementById('filelist').innerHTML += `<div id="${file.id}">${file.name} (${plupload.formatSize(file.size)}) <strong></strong></div>`;
+							});
+							uploader.start();
+						},
+						FileUploaded: function (up, file, reponse) {
+							//reponse=JSON.parse(reponse);
+							//console.log(reponse);
+							$('#attach').append(reponse['response']);
+						},
+						UploadProgress: function (up, file) {
+							document.querySelector(`#${file.id} strong`).innerHTML = `<span>${file.percent}%</span>`;
+						},
+						Error: function (up, err) {
+							console.log(err);
+						}
+					}
+				});
+				uploader.init();
+			});
+		</script>
+
+		<!-- UPLOAD FORM -->
+		<div id="container">
+		<button class="btn btn-success" id="pickfiles">Send files</button>
+		</div>
+
+		<!-- UPLOAD FILE LIST -->
+		<div id="filelist">Your browser doesn't support HTML5 upload.</div>
+
+<?php		
+	}	
 ?>			
-			<br><span id=progress></span><br>
-			<input style="display: none;" type="file" id="upload" onchange="handleFileSelect(event);">
-			
 		</div>
 	</body>
 </html>
