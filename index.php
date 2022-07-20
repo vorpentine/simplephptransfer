@@ -20,6 +20,7 @@ if ($file) {
 		//print_r($details);
 		//echo $file;
 		if ($_SESSION['TS']==$_GET['ts']) {
+			$details['filename']=preg_replace('/[^A-Za-z0-9\.\-]/',"_",$details['filename']);
 			header("Content-disposition: attachment; filename=".$details['filename']);
 			header("Content-type: ".$details['type']."/download");
 			readfile("/var/www/attachments/$file");
